@@ -33,28 +33,45 @@ lcd_data:
     rcall pulse_enable
     ret
 
-;------------------------------------------------------
-; Sous-programme : Petite pause (~1ms)
-delay:
-    ldi r18, 255
-delay_loop:
-    dec r18
-    brne delay_loop
-    ret
+    
+delay_def:
+
+	ldi r24, 0
+	sts TCNT2, r24
+	
+	ldi r24, (1 << WGM21)  ; Mode CTC
+    sts TCCR2A, r24
+
+    ldi r24, (1 << CS22) | (1 << CS21) ; prescaler 64
+    sts TCCR2B, r24
+
+    ldi r24, 499 ; Delay = (OCRnA + 1) * Prescaler / F_CPU : ~2ms
+    sts OCR2A, r24
+
+	ret
 
 ;------------------------------------------------------
-; Sous-programme : Longue pause (~50ms)
-long_delay:
-    ldi r19, 100
-long_delay_loop:
-    rcall delay
-    dec r19
-    brne long_delay_loop
+; Sous-programme : (~1ms) avec Timer2
+delay:
+   ldi r19, 22 ;  delay  : 22 * 2ms ~ 44 ms
+wait_compare:
+	sbis TIFR2, OCF2A
+	rjmp wait_compare
+ 
+    ldi r24, (1 << OCF2A) ; Effacer le flag
+    out TIFR2, r24
+	dec r19
+	brne wait_compare
     ret
 
 ;------------------------------------------------------
 ; Routine de démarrage
 RESET:
+
+	;configuratuon du Timer2
+
+	rcall delay_def
+
     ; Configurer PORTB comme sortie (bus de données LCD)
     ldi r16, 0xFF
     out DDRB, r16
@@ -64,7 +81,7 @@ RESET:
     out DDRC, r16
 
     ; Attendre la stabilisation du LCD (~50ms)
-    rcall long_delay
+    rcall delay
 
     ; Initialisation LCD
     ; Fonction : 8 bits, 2 lignes, 5x8 points
@@ -84,7 +101,7 @@ RESET:
     rcall lcd_command
 
     ; Pause longue après effacement
-    rcall long_delay
+    rcall delay
 
     ; Configurer PD0 comme entrée et PD3 comme sortie
     ldi r16, 0b00001000 ; PD3 sortie
@@ -103,7 +120,7 @@ RESET:
     out EIMSK, r16
 
     ; Initialiser le flag d’état à OFF (0)
-    ldi r20, 0x00
+    ldi r20, 0
 
     ; Activer les interruptions globales
     sei
@@ -119,15 +136,18 @@ INT0_ISR:
     push r17
     push r18
 
-    ; Toggle PD3 (par exemple LED)
-    sbi PIND, 3 ; Inverser l’état de PD3
+    
+    in r17, PORTD
+   	ldi r18, (1<<PORTD3)
+    eor r17, r18
+    out PORTD, r17
 
     ; Effacer l’écran
     ldi r16, 0b00000001
     rcall lcd_command
 
     ; Pause après effacement
-    rcall long_delay
+    rcall delay
 
     ; Vérifier l'état actuel et afficher ON ou OFF
     tst r20          ; Tester si r20 == 0 (OFF)
@@ -143,7 +163,7 @@ afficher_OFF:
     rcall lcd_data
 
     ; Mettre le flag à 0
-    ldi r20, 0x00
+    ldi r20, 0
     rjmp fin_ISR
 
 afficher_ON:
@@ -154,7 +174,7 @@ afficher_ON:
     rcall lcd_data
 
     ; Mettre le flag à 1
-    ldi r20, 0x01
+    ldi r20, 1
 
 fin_ISR:
     ; Restaurer registres
