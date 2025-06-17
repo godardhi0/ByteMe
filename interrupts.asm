@@ -45,7 +45,7 @@ delay_def:
     ldi r24, (1 << CS22) | (1 << CS21) ; prescaler 64
     sts TCCR2B, r24
 
-    ldi r24, 499 ; Delay = (OCRnA + 1) * Prescaler / F_CPU : ~2ms
+    ldi r24, 249 ; Delay = (OCRnA + 1) * Prescaler / F_CPU : 
     sts OCR2A, r24
 
 	ret
@@ -53,7 +53,7 @@ delay_def:
 ;------------------------------------------------------
 ; Sous-programme : (~1ms) avec Timer2
 delay:
-   ldi r19, 22 ;  delay  : 22 * 2ms ~ 44 ms
+   ldi r19, 10 ;  
 wait_compare:
 	sbis TIFR2, OCF2A
 	rjmp wait_compare
@@ -72,12 +72,14 @@ RESET:
 
 	rcall delay_def
 
+
     ; Configurer PORTB comme sortie (bus de données LCD)
     ldi r16, 0xFF
     out DDRB, r16
 
-    ; Configurer PC5 (E), PC6 (RW), PC7 (RS) comme sorties
+    ; Configurer PC5 (E), PC6 (RW), PC7 (RS) comme sorties ; PC1 comme entre
     ldi r16, 0b11100000
+    SBI PORTC, 1
     out DDRC, r16
 
     ; Attendre la stabilisation du LCD (~50ms)
@@ -151,6 +153,10 @@ INT0_ISR:
 
     ; Vérifier l'état actuel et afficher ON ou OFF
     tst r20          ; Tester si r20 == 0 (OFF)
+
+
+	;vérifie si la led est bien connectée 
+    sbis PINC, 1
     breq afficher_ON ; Si OFF, passer à ON
 
 afficher_OFF:
