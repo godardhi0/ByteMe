@@ -1,5 +1,6 @@
 .include "m2560def.inc" ; Inclusion des définitions pour ATmega2560
 
+
 .org 0x0000
     rjmp RESET          ; Vecteur de reset
 
@@ -137,11 +138,12 @@ INT0_ISR:
     push r16
     push r17
     push r18
+    push r21
 
-    
-    in r17, PORTD
+    ; toggle the port at which the led is connected to
+    in r17, PORTD ; read value 
    	ldi r18, (1<<PORTD3)
-    eor r17, r18
+    eor r17, r18 ; 
     out PORTD, r17
 
     ; Effacer l’écran
@@ -151,41 +153,51 @@ INT0_ISR:
     ; Pause après effacement
     rcall delay
 
-    ; Vérifier l'état actuel et afficher ON ou OFF
-    tst r20          ; Tester si r20 == 0 (OFF)
+ 
 
+	ldi r21, (1<<PD3)
+	in r18, PIND
+	and r18, r21
+	cpi r18, 0
+	breq afficher_OFF
 
-	;vérifie si la led est bien connectée 
-    sbis PINC, 1
-    breq afficher_ON ; Si OFF, passer à ON
-
-afficher_OFF:
-    ; Afficher 'OFF'
-    ldi r16, 'O'
+	; Afficher 'ON'
+    ldi r16, 'L'
     rcall lcd_data
-    ldi r16, 'F'
+    ldi r16, 'E'
     rcall lcd_data
-    ldi r16, 'F'
+    ldi r16, 'D'
     rcall lcd_data
-
-    ; Mettre le flag à 0
-    ldi r20, 0
-    rjmp fin_ISR
-
-afficher_ON:
-    ; Afficher 'ON'
     ldi r16, 'O'
     rcall lcd_data
     ldi r16, 'N'
     rcall lcd_data
 
-    ; Mettre le flag à 1
-    ldi r20, 1
+	rjmp fin_ISR
+
+afficher_OFF:
+    ; Afficher 'OFF'
+    ldi r16, 'L'
+    rcall lcd_data
+    ldi r16, 'E'
+    rcall lcd_data
+    ldi r16, 'D'
+    rcall lcd_data
+    ldi r16, 'O'
+    rcall lcd_data
+    ldi r16, 'F'
+    rcall lcd_data
+	ldi r16, 'F'
+    rcall lcd_data
+
+    rjmp fin_ISR
 
 fin_ISR:
     ; Restaurer registres
     pop r18
     pop r17
     pop r16
+    pop r21
 
-    reti
+    reti ; The processor pops the return address and status register from the stack, 
+    		;restoring the state before the interrupt occurred.
